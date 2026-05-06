@@ -1,4 +1,5 @@
 ---
+layout: page
 title: "Term Project Proposal — Intro to Deep Learning"
 ---
 

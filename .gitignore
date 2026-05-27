@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+data/flickr8k/
+data/features/
+reports/runs/
+*.pt
+*.npy
+.DS_Store

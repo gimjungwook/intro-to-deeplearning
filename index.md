@@ -1,24 +1,34 @@
 ---
 layout: page
-title: "Term Project Proposal — Intro to Deep Learning"
+title: "Term Project — Intro to Deep Learning"
 ---
 
-# Term Project Proposal — Intro to Deep Learning
+# Term Project — Intro to Deep Learning
 
 **Course:** Intro to Deep Learning (Spring 2026)
 **Instructor:** Heeyoul "Henry" Choi
+**Student:** Jungwook Kim (22000168) — Handong Global University
+**Title:** *Reproducing **Show, Attend and Tell**: Soft-Attention Image Captioning on Flickr8k*
 
 ---
 
-## Student(s)
+## Final result (accepted run `20260527-2252`)
 
-**Jungwook Kim** (22000168) — Handong Global University
+| Beam | BLEU-1 | BLEU-2 | BLEU-3 | **BLEU-4** |
+|----:|-------:|-------:|-------:|-----------:|
+| 1 (greedy) | 0.5995 | 0.4268 | 0.2926 | 0.2049 |
+| **3** | 0.6283 | 0.4517 | 0.3159 | **0.2195** |
+| 5 | 0.6356 | 0.4583 | 0.3228 | 0.2266 |
 
-## Title
+- **Attention noun-peak QC:** 23 / 24
+- **ACCEPT gate:** all four conditions cleared on the first full cycle (no C1-C5 retraining)
+- **Full report:** [`reports/final-report.md`](https://github.com/gimjungwook/intro-to-deeplearning/blob/main/reports/final-report.md)
+- **Iteration log:** [`ITER_LOG.md`](https://github.com/gimjungwook/intro-to-deeplearning/blob/main/ITER_LOG.md)
+- **Run directory:** [`reports/runs/20260527-2252/`](https://github.com/gimjungwook/intro-to-deeplearning/tree/main/reports/runs/20260527-2252)
 
-**Reproducing *Show, Attend and Tell*: Soft-Attention Image Captioning on Flickr8k**
+---
 
-## Summary
+## Proposal summary
 
 People effortlessly describe a photograph in natural language, but teaching a machine to do the same requires solving three problems at once: extracting visual structure, generating fluent text, and aligning the two modalities word by word. Image captioning sits at this intersection and remains a foundational testbed for multimodal learning.
 

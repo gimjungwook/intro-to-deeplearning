@@ -117,8 +117,16 @@ NOUN_POS_HINT = {  # cheap heuristic; real POS would need nltk pos tag
 }
 
 
-def attention_noun_peak_score(records, grid: int = 7) -> tuple[int, int]:
-    """Heuristic alignment QC: count records where attention has a clear peak (max>2*mean) at any noun token."""
+def attention_noun_peak_score(records, grid: int = 7, sample_size: int | None = 24, seed: int = 0) -> tuple[int, int]:
+    """Heuristic alignment QC over a fixed-size sample (default 24 records).
+
+    A record passes when attention at *any* noun token in the hypothesis has
+    `max > 2 * mean` (i.e. a clear peak instead of a flat/uniform map).
+    """
+    if sample_size is not None and len(records) > sample_size:
+        rng = np.random.default_rng(seed)
+        idx = rng.choice(len(records), size=sample_size, replace=False)
+        records = [records[i] for i in idx]
     ok = 0
     total = 0
     for img_id, hyp_tok, refs_tok, alphas in records:

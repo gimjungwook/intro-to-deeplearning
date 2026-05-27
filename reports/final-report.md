@@ -35,6 +35,25 @@ BLEU-1~4 compare n-gram overlap between generated and reference captions; with 5
 
 ## 3. Method
 
+**Figure 0.** End-to-end pipeline. The encoder is run once and its outputs are cached; only the decoder, attention module, and word embeddings are trained.
+
+```mermaid
+flowchart LR
+    A[Image 224x224] --> B[ResNet-101<br/>frozen]
+    B --> C[7x7x2048<br/>=49 region vectors]
+    C -.cache.-> D[.npy on disk]
+    D --> E[Soft Attention<br/>MLP]
+    F[h_t-1 LSTM hidden] --> E
+    E -->|alpha_t,i| G[Context z_t<br/>weighted sum]
+    G --> H[Beta gate]
+    H --> I[LSTMCell]
+    J[Embed y_t-1] --> I
+    I --> K[Linear -> Softmax]
+    K --> L[Next token y_t]
+    L -.feedback.-> J
+    I -.h_t.-> F
+```
+
 ### 3.1 Data
 
 Flickr8k (8,091 images, ≈40k captions, ≈5 per image) was retrieved from the `jxie/flickr8k` HuggingFace mirror as Parquet shards and materialized to `data/flickr8k/{Images,captions.txt}` by `scripts/download_flickr8k.py`. The local layout matches the original UIUC tarball so the loader is mirror-agnostic.
@@ -108,6 +127,10 @@ Per-epoch trace:
 
 Total compute: ~27 minutes of MPS time on an Apple M-series GPU (Python 3.14.3, PyTorch 2.12.0). Attention entropy decreased steadily from ~3.79 toward ~3.37 as the decoder learned to focus on a narrower region per word — exactly the behaviour the doubly-stochastic regularizer is supposed to allow without collapsing entirely.
 
+**Figure 1.** Training and validation loss across ten epochs. Train loss falls monotonically; val loss bottoms at epoch 5 and then drifts up — the early-stop signal.
+
+![Loss curve](figures_loss_curve.png)
+
 ### 4.3 Beam search ablation (400 val images)
 
 | Beam | BLEU-1 | BLEU-2 | BLEU-3 | **BLEU-4** |
@@ -132,6 +155,24 @@ All four conditions cleared on the first full cycle; no C1-C5 hypothesis sweep w
 ### 4.5 Attention gallery
 
 Twelve random, twelve hard, and twelve failure overlays are written to `reports/runs/20260527-2252/samples/` (`{rand,hard,fail}_NN_<image_id>.png`). Each PNG is a per-token heatmap grid showing where the model attended while generating each word; noun tokens consistently peak on the corresponding object (the 23/24 QC reflects exactly this).
+
+**Figure 2 (random eval images — model behaving as expected).** Per-token attention overlays. Each tile is the same 224×224 image with the attention mass of that generation step painted in jet colormap.
+
+![Attention — random eval 0](figures_attn_random_00.png)
+
+![Attention — random eval 1](figures_attn_random_01.png)
+
+**Figure 3 (hard images — low unigram overlap, on-topic).** Attention often peaks on the right region, but the language head emits a more generic noun than the reference uses.
+
+![Attention — hard 0](figures_attn_hard_00.png)
+
+![Attention — hard 1](figures_attn_hard_01.png)
+
+**Figure 4 (clearest failures).** Generic-caption collapse and color-attribute confusion are visible; attention is still on the right region but the language head chooses the corpus-frequent token.
+
+![Attention — failure 0](figures_attn_fail_00.png)
+
+![Attention — failure 1](figures_attn_fail_01.png)
 
 ## 5. Failure analysis
 

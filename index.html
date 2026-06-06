@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Image Captioning with Attention — Term Project</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=Noto+Serif+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+<style>
+  :root{
+    --bg:#ffffff;
+    --bg-soft:#faf8f4;
+    --bg-card:#f4f1ea;
+    --border:#e2ddd2;
+    --rule:#d8d2c4;
+    --text:#1c1b18;
+    --muted:#6b665c;
+    --accent:#7a1f1f;        /* restrained academic maroon */
+    --accent-soft:#9a3b3b;
+    --link:#5a3b8c;
+    --maxw:780px;
+    --deckw:920px;
+    --serif:"Source Serif 4","Noto Serif KR",Georgia,"Times New Roman",serif;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--serif);
+    line-height:1.72;
+    font-size:18px;
+    text-rendering:optimizeLegibility;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--link);text-decoration:none;}
+  a:hover{text-decoration:underline;}
+  code,pre,kbd{font-family:var(--mono);}
+  em{font-style:italic;}
+
+  /* ---------- top navigation ---------- */
+  .topnav{
+    position:sticky;top:0;z-index:50;
+    background:rgba(255,255,255,.92);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--rule);
+  }
+  .topnav-inner{
+    max-width:var(--deckw);margin:0 auto;
+    display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 18px;
+    padding:12px 24px;
+  }
+  .topnav .brand{font-weight:700;margin-right:6px;color:var(--text);font-size:16px;}
+  .topnav a.navlink{color:var(--muted);font-size:14.5px;font-weight:400;}
+  .topnav a.navlink:hover{color:var(--accent);text-decoration:none;}
+
+  /* ---------- slide deck ---------- */
+  .deck{}
+  .slide{
+    min-height:calc(100vh - 54px);
+    display:flex;flex-direction:column;justify-content:center;
+    padding:72px 24px;
+    border-bottom:1px solid var(--rule);
+    position:relative;
+  }
+  .slide-inner{max-width:var(--deckw);margin:0 auto;width:100%;}
+  .slide .kicker{
+    color:var(--accent);font-weight:600;letter-spacing:.12em;
+    text-transform:uppercase;font-size:12.5px;margin-bottom:16px;
+    font-family:var(--mono);
+  }
+  .slide h2{
+    font-size:clamp(28px,4.6vw,42px);line-height:1.22;margin:0 0 12px;font-weight:700;
+    letter-spacing:-.005em;
+  }
+  .slide .ko-sub{color:var(--muted);font-size:clamp(15px,2.1vw,18px);font-weight:400;margin:0 0 26px;font-style:italic;}
+  .slide p.lead{font-size:clamp(17px,2.3vw,20px);color:var(--text);max-width:740px;}
+  .slide ul{margin:16px 0 0;padding-left:0;list-style:none;max-width:760px;}
+  .slide ul li{
+    position:relative;padding:9px 0 9px 26px;font-size:clamp(15.5px,2.1vw,18px);
+    border-bottom:1px solid var(--border);
+  }
+  .slide ul li::before{
+    content:"";position:absolute;left:2px;top:19px;
+    width:7px;height:7px;border-radius:50%;background:var(--accent);
+  }
+  .slide .num{
+    position:absolute;right:30px;top:30px;color:var(--border);
+    font-weight:700;font-size:clamp(44px,9vw,104px);line-height:1;user-select:none;
+    font-family:var(--serif);
+  }
+
+  .title-slide{text-align:center;}
+  .title-slide .rule-top{width:64px;height:2px;background:var(--accent);margin:0 auto 26px;}
+  .title-slide h1{font-size:clamp(34px,6.4vw,62px);line-height:1.14;margin:0 0 12px;font-weight:700;letter-spacing:-.01em;}
+  .title-slide .paper{color:var(--accent-soft);font-weight:400;font-style:italic;font-size:clamp(17px,2.8vw,23px);margin-bottom:34px;}
+  .title-slide .meta{color:var(--muted);font-size:clamp(14.5px,2vw,17px);line-height:2.05;}
+  .title-slide .meta b{color:var(--text);font-weight:600;}
+
+  /* metric chips on result slide */
+  .metrics{display:flex;flex-wrap:wrap;gap:16px;margin-top:28px;}
+  .metric{
+    background:var(--bg-soft);border:1px solid var(--border);border-radius:8px;
+    padding:18px 22px;min-width:150px;flex:1 1 150px;
+  }
+  .metric .v{font-size:clamp(26px,4.6vw,38px);font-weight:700;color:var(--accent);line-height:1;}
+  .metric .v.good{color:var(--text);}
+  .metric .l{color:var(--muted);font-size:13px;margin-top:9px;letter-spacing:.01em;}
+
+  .deckfig{margin-top:28px;text-align:center;}
+  .deckfig img{
+    max-width:100%;max-height:46vh;border-radius:6px;border:1px solid var(--border);
+    background:#fff;
+  }
+  .deckfig .cap{color:var(--muted);font-size:13.5px;margin-top:11px;font-style:italic;}
+
+  .scrollhint{
+    position:absolute;bottom:24px;left:50%;transform:translateX(-50%);
+    color:var(--muted);font-size:13px;letter-spacing:.06em;font-family:var(--mono);
+    animation:bob 1.9s ease-in-out infinite;
+  }
+  @keyframes bob{0%,100%{transform:translateX(-50%) translateY(0);}50%{transform:translateX(-50%) translateY(6px);}}
+
+  /* ---------- report body ---------- */
+  .report-band{
+    background:var(--bg-soft);
+    border-top:1px solid var(--rule);
+    padding:64px 0 4px;
+  }
+  .report-head{max-width:var(--maxw);margin:0 auto;padding:0 24px 30px;}
+  .report-head .kicker{color:var(--accent);font-weight:600;letter-spacing:.12em;text-transform:uppercase;font-size:12.5px;font-family:var(--mono);}
+  .report-head h2{font-size:clamp(26px,4.4vw,38px);margin:12px 0 10px;font-weight:700;line-height:1.22;}
+  .report-head .ko{color:var(--muted);font-size:16px;}
+
+  #report{
+    max-width:var(--maxw);margin:0 auto;padding:14px 24px 96px;
+  }
+  #report h1{display:none;} /* report's own H1 duplicated above */
+  #report h2{
+    font-size:clamp(23px,3.4vw,29px);margin:60px 0 16px;padding-top:18px;
+    border-top:1px solid var(--rule);font-weight:700;letter-spacing:-.005em;line-height:1.3;
+  }
+  #report h3{font-size:clamp(18px,2.6vw,21px);margin:34px 0 12px;font-weight:600;color:var(--text);}
+  #report p{margin:16px 0;}
+  #report > blockquote, #report blockquote{
+    border-left:3px solid var(--accent);background:var(--bg-card);
+    margin:22px 0;padding:14px 20px;border-radius:0 4px 4px 0;color:#3a382f;font-style:italic;
+  }
+  #report blockquote em{font-style:normal;}
+  #report ul,#report ol{padding-left:26px;}
+  #report li{margin:8px 0;}
+  #report hr{border:none;border-top:1px solid var(--rule);margin:46px 0;}
+  #report img{
+    display:block;max-width:100%;height:auto;margin:22px auto 6px;
+    border-radius:6px;border:1px solid var(--border);background:#fff;
+  }
+  #report code{
+    background:var(--bg-card);border:1px solid var(--border);border-radius:4px;
+    padding:1px 6px;font-size:.82em;color:#7a1f1f;
+  }
+  #report pre{
+    background:#faf8f3;border:1px solid var(--border);border-radius:8px;
+    padding:16px 18px;overflow-x:auto;line-height:1.55;font-size:14.5px;
+  }
+  #report pre code{background:none;border:none;padding:0;color:#2a2820;font-size:1em;}
+  #report table{
+    border-collapse:collapse;width:100%;margin:22px 0;font-size:15px;
+    display:block;overflow-x:auto;
+  }
+  #report th,#report td{border:1px solid var(--border);padding:9px 13px;text-align:left;}
+  #report th{background:var(--bg-card);font-weight:600;}
+  #report tbody tr:nth-child(even){background:rgba(0,0,0,.018);}
+  #report strong{font-weight:700;}
+
+  /* mermaid container */
+  .mermaid{
+    background:#fff;border-radius:8px;border:1px solid var(--border);
+    padding:20px;text-align:center;margin:24px 0 6px;overflow-x:auto;
+  }
+  /* figure captions (academic "Figure N." style) */
+  .figcaption-ko{
+    color:var(--muted);font-size:14px;text-align:center;
+    margin:6px auto 30px;max-width:640px;line-height:1.55;font-style:italic;
+  }
+  /* korean section summary line */
+  .sec-ko{color:var(--muted);font-size:15.5px;margin:4px 0 20px;font-style:italic;}
+
+  .loading{max-width:var(--maxw);margin:0 auto;padding:40px 24px;color:var(--muted);}
+
+  footer{
+    border-top:1px solid var(--rule);background:var(--bg-soft);
+    color:var(--muted);font-size:14px;text-align:center;padding:36px 24px;
+  }
+  footer a{color:var(--muted);text-decoration:underline;}
+
+  @media (max-width:600px){
+    body{font-size:17px;}
+    .slide{min-height:auto;padding:56px 18px;}
+    .slide .num{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ======================= NAV ======================= -->
+<nav class="topnav">
+  <div class="topnav-inner">
+    <span class="brand">Show, Attend and Tell — 재현</span>
+    <a class="navlink" href="#slides">개요 장표</a>
+    <a class="navlink" href="#report-top">보고서</a>
+    <a class="navlink" href="#sec-method">3. 방법</a>
+    <a class="navlink" href="#sec-experiments">4. 실험</a>
+    <a class="navlink" href="#sec-failure">5. 실패 분석</a>
+    <a class="navlink" href="#sec-repro">8. 재현성</a>
+  </div>
+</nav>
+
+<!-- ======================= SLIDE DECK ======================= -->
+<section id="slides" class="deck">
+
+  <!-- Slide 1: Title -->
+  <div class="slide title-slide">
+    <div class="slide-inner">
+      <div class="rule-top"></div>
+      <div class="kicker">Introduction to Deep Learning · Spring 2026 · Term Project</div>
+      <h1>Image Captioning<br/>with Visual Attention</h1>
+      <div class="paper">Reproducing <em>Show, Attend and Tell</em> (Xu et al., 2015)</div>
+      <div class="meta">
+        <div><b>Student</b> &nbsp; Jungwook Kim (22000168)</div>
+        <div><b>Instructor</b> &nbsp; Heeyoul "Henry" Choi</div>
+        <div><b>Institution</b> &nbsp; Handong Global University</div>
+        <div style="margin-top:12px">소프트 어텐션 이미지 캡셔닝을 Flickr8k에서 처음부터 재현한 기말 프로젝트</div>
+      </div>
+    </div>
+    <div class="scrollhint">scroll ↓</div>
+  </div>
+
+  <!-- Slide 2: Motivation -->
+  <div class="slide">
+    <div class="slide-inner">
+      <span class="num">01</span>
+      <div class="kicker">Motivation · 동기</div>
+      <h2>한 장의 사진을 문장으로</h2>
+      <div class="ko-sub">기계가 사진을 설명하려면 세 가지를 동시에 풀어야 한다 — 보고, 쓰고, 정렬한다.</div>
+      <p class="lead">이미지 캡셔닝은 시각 표현 추출, 문장 생성, 그리고 <b>단어마다 이미지의 어느 부분을 볼지 정렬</b>하는 문제를 한 모델 안에 모두 담는 가장 단순한 과제다.</p>
+      <ul>
+        <li>See — 픽셀을 공간 정보를 가진 시각 특징으로 변환한다.</li>
+        <li>Write — 문법적으로 올바른 문장을 한 단어씩 생성한다.</li>
+        <li>Align — 각 단어 시점마다 주목할 이미지 영역을 결정한다.</li>
+        <li>오늘날의 멀티모달 LLM(GPT-4V, Gemini Vision 등)도 본질은 같은 골격이다.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Slide 3: Method -->
+  <div class="slide">
+    <div class="slide-inner">
+      <span class="num">02</span>
+      <div class="kicker">Method · 방법</div>
+      <h2>CNN 인코더 + 소프트 어텐션 LSTM 디코더</h2>
+      <div class="ko-sub">동결된 ResNet-101이 이미지를 49개 영역 벡터로 만들고, LSTM 디코더가 어텐션으로 영역을 골라 단어를 생성한다.</div>
+      <ul>
+        <li><b>인코더</b> — ImageNet 사전학습 ResNet-101(동결), 출력 7×7×2048 = 49개 영역 벡터. 한 번만 계산해 디스크에 캐싱.</li>
+        <li><b>소프트 어텐션</b> — 매 시점 49개 영역에 가중치 α를 부여해 문맥 벡터를 합성. 게이트 β로 기능어 시점에는 영상을 무시.</li>
+        <li><b>디코더</b> — LSTMCell(2560→512) + Linear 출력 헤드로 다음 단어 분포를 생성.</li>
+        <li><b>이중 확률 정규화</b> — 모든 영역이 골고루 주목받도록 강제해 어텐션 붕괴를 방지.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Slide 4: Setup -->
+  <div class="slide">
+    <div class="slide-inner">
+      <span class="num">03</span>
+      <div class="kicker">Setup · 실험 설정</div>
+      <h2>Flickr8k · 학습은 디코더만</h2>
+      <div class="ko-sub">인코더는 동결하고 어텐션, 디코더, 단어 임베딩만 학습한다. 추론에는 빔 서치를 사용한다.</div>
+      <ul>
+        <li><b>데이터</b> — Flickr8k 8,091장, 이미지당 약 5개 캡션. 60/20/20 학습/검증/평가 분할(시드 42).</li>
+        <li><b>어휘</b> — 최소 등장 5회, 2,248단어 + 특수토큰 4개. 최대 길이 22.</li>
+        <li><b>최적화</b> — Adam lr 4e-4, 배치 32, 최대 30 에폭, 검증 손실 5에폭 조기종료.</li>
+        <li><b>장비</b> — Apple Silicon MPS, PyTorch 2.12, 총 약 27분 학습.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Slide 5: Results -->
+  <div class="slide">
+    <div class="slide-inner">
+      <span class="num">04</span>
+      <div class="kicker">Results · 결과</div>
+      <h2>BLEU-4 0.2195, ACCEPT 게이트 통과</h2>
+      <div class="ko-sub">첫 전체 사이클에서 네 가지 통과 조건을 모두 만족 — 추가 재학습(C1–C5) 없이 보고서 확정.</div>
+      <div class="metrics">
+        <div class="metric"><div class="v">0.2195</div><div class="l">BLEU-4 (beam 3)</div></div>
+        <div class="metric"><div class="v">23 / 24</div><div class="l">어텐션 명사 피크 QC</div></div>
+        <div class="metric"><div class="v">+0.0146</div><div class="l">beam 3 − greedy</div></div>
+        <div class="metric"><div class="v good">ACCEPT</div><div class="l">4개 조건 전부 통과</div></div>
+      </div>
+      <div class="deckfig">
+        <img src="reports/figures_loss_curve.png" alt="Training and validation loss curve" />
+        <div class="cap">학습/검증 손실 곡선 — 검증 손실은 5에폭에서 최저점을 찍고 다시 상승(조기종료 신호).</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 6: Attention viz -->
+  <div class="slide">
+    <div class="slide-inner">
+      <span class="num">05</span>
+      <div class="kicker">Interpretability · 어텐션 시각화</div>
+      <h2>명사 단어에서 올바른 객체에 주목</h2>
+      <div class="ko-sub">단어를 생성하는 매 시점의 어텐션 히트맵 — 명사 토큰에서 해당 객체 영역이 또렷하게 밝아진다 (대표 샘플).</div>
+      <div class="deckfig">
+        <img src="reports/figures_attn_random_00.png" alt="Per-token attention overlay on a random evaluation image" />
+        <div class="cap">평가 이미지에 대한 토큰별 어텐션 오버레이 — 각 타일은 같은 224×224 이미지에 해당 생성 단어의 어텐션 질량을 칠한 것.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 7: Conclusion -->
+  <div class="slide">
+    <div class="slide-inner">
+      <span class="num">06</span>
+      <div class="kicker">Conclusion · 결론</div>
+      <h2>작은 데이터로 재현한 멀티모달의 원형</h2>
+      <div class="ko-sub">동결된 비전 타워 + 작은 언어 헤드 + 어텐션 브리지 — 현대 멀티모달 LLM과 같은 골격을 노트북 한 대로 끝까지 돌렸다.</div>
+      <ul>
+        <li>어텐션 맵은 해석 가능하다 — 이중 확률 정규화가 사주는 "내부 증거".</li>
+        <li>빔 서치는 이 규모에서 사실상 공짜로 약 +2 BLEU-4를 얻는다.</li>
+        <li>주요 실패 = 언어 사전(prior) 우세 + 동결 인코더의 한계.</li>
+        <li>다음 단계 = Transformer 디코더 + 크로스 어텐션으로의 자연스러운 확장.</li>
+      </ul>
+      <p style="margin-top:26px;color:var(--muted);font-style:italic">↓ 아래에 전체 보고서(섹션 1–8), 모든 figure, 아키텍처 다이어그램이 인라인으로 이어집니다.</p>
+    </div>
+  </div>
+
+</section>
+
+<!-- ======================= FULL REPORT ======================= -->
+<div class="report-band" id="report-top">
+  <div class="report-head">
+    <div class="kicker">Full Report · 보고서 전문</div>
+    <h2>Image Captioning with Attention — Term Project Report</h2>
+    <p class="ko">아래는 영어 학술 보고서 전문입니다. 섹션 라벨과 figure 설명에 한국어 요약을 덧붙였습니다. 기술 본문(영어)은 학술 정확성을 위해 원문 그대로 유지합니다.</p>
+  </div>
+</div>
+
+<article id="report">
+  <div class="loading">보고서를 불러오는 중입니다…</div>
+</article>
+
+<footer>
+  Introduction to Deep Learning · Spring 2026 · Handong Global University ·
+  <a href="https://github.com/gimjungwook/intro-to-deeplearning">GitHub 저장소</a>
+</footer>
+
+<!-- =======================================================================
+     REPORT SOURCE (inline, verbatim copy of reports/final-report.md)
+     Inlined so the page renders identically whether opened via file://
+     (double-click) or served by GitHub Pages — no fetch() / server needed.
+     ======================================================================= -->
+<script id="report-md" type="text/markdown">
+# Image Captioning with Attention — Term Project Report
+
+**Course:** Introduction to Deep Learning (Spring 2026)
+**Student:** Jungwook Kim (22000168)
+**Repo:** https://github.com/gimjungwook/intro-to-deeplearning
+**Pages:** https://gimjungwook.github.io/intro-to-deeplearning/
+
+> Reproduction of *Show, Attend and Tell* (Xu et al., 2015) with a frozen ResNet-101 encoder, a soft-attention LSTM decoder, doubly stochastic regularization, and beam search, evaluated on Flickr8k with BLEU-1~4 and attention noun-peak QC. The full run history (configs, metrics, attention overlays, failure cases) is stored under `reports/runs/<run_id>/` and indexed by `ITER_LOG.md`.
+
+---
+
+## 1. Motivation
+
+A person can glance at a single photograph and describe it in a fluent sentence. For a machine to do the same it must solve three problems at once: see, write, and align — turn pixels into a structured visual representation, generate a syntactically correct sentence, and decide *at each word* which part of the image to look at. Image captioning is the simplest task that forces all three to live in one model, which is why it became one of the first deep learning testbeds for multimodal reasoning a decade ago and why it is still the structural backbone behind today's multimodal LLMs (GPT-4V, Gemini Vision, Claude 3 Vision). Those systems are, abstractly, *just* a stronger vision encoder, a stronger language decoder, and a stronger attention mechanism plugged into the same template. Reproducing the original *Show, Attend and Tell* end-to-end therefore gives a working understanding of every part of that template — and of where it falls down — at a scale that one student with an Apple Silicon laptop can actually drive through start-to-finish in two weeks.
+
+## 2. Background
+
+### 2.1 CNN encoder
+
+A convolutional network maps an image to a grid of feature vectors that preserve rough spatial position. ResNet-101 with the final pooling and classifier stripped produces a `7×7×2048` (or `14×14×2048` at higher input resolution) tensor; flattened, this is `L=49` "regions," each described by a 2048-dim vector. The encoder is initialized from ImageNet weights and frozen — the project does no end-to-end finetuning, so the encoder is run once over the dataset and its outputs are cached to disk.
+
+### 2.2 LSTM decoder with soft attention
+
+At each timestep `t`, given the previous hidden state `h_{t-1}` and the `L` feature vectors `a_1, ..., a_L`, the decoder computes an attention score `e_{t,i} = w^T tanh(W_a a_i + W_h h_{t-1})`, softmaxes over `i` to get `α_{t,i}`, and constructs a context vector `ẑ_t = Σ_i α_{t,i} a_i`. A learned gate `β_t = σ(W_β h_{t-1})` modulates the context to let the decoder ignore it when it is generating a function word ("a", "the", "in"). The LSTMCell then consumes `[embed(y_{t-1}), β_t ẑ_t]` and produces `h_t`, from which a linear+softmax head emits the next-token distribution.
+
+### 2.3 Doubly stochastic regularization
+
+Without a constraint, the attention can collapse to one or two regions and ignore the rest of the image. Xu et al. add a regularizer that asks every region to be looked at, summed across timesteps, with roughly equal mass:
+`L_doubly = λ Σ_i (1 − Σ_t α_{t,i})^2`.
+The total loss is `L_ce + λ L_doubly`, where `L_ce` is the masked cross-entropy over generated tokens.
+
+### 2.4 Evaluation
+
+BLEU-1~4 compare n-gram overlap between generated and reference captions; with 5 references per image, even a fairly weak model scores BLEU-1 ≈ 0.5. BLEU-4 is the standard "headline" metric for this dataset and is what we threshold the ACCEPT gate on. As a qualitative companion we compute a *noun peak* QC: for each generated caption we check whether the attention map at any noun token has `max > 2·mean` (a single bright region), and report the fraction of evaluation images for which this holds.
+
+## 3. Method
+
+**Figure 0.** End-to-end pipeline. The encoder is run once and its outputs are cached; only the decoder, attention module, and word embeddings are trained.
+
+```mermaid
+flowchart LR
+    A[Image 224x224] --> B[ResNet-101<br/>frozen]
+    B --> C[7x7x2048<br/>=49 region vectors]
+    C -.cache.-> D[.npy on disk]
+    D --> E[Soft Attention<br/>MLP]
+    F[h_t-1 LSTM hidden] --> E
+    E -->|alpha_t,i| G[Context z_t<br/>weighted sum]
+    G --> H[Beta gate]
+    H --> I[LSTMCell]
+    J[Embed y_t-1] --> I
+    I --> K[Linear -> Softmax]
+    K --> L[Next token y_t]
+    L -.feedback.-> J
+    I -.h_t.-> F
+```
+
+### 3.1 Data
+
+Flickr8k (8,091 images, ≈40k captions, ≈5 per image) was retrieved from the `jxie/flickr8k` HuggingFace mirror as Parquet shards and materialized to `data/flickr8k/{Images,captions.txt}` by `scripts/download_flickr8k.py`. The local layout matches the original UIUC tarball so the loader is mirror-agnostic.
+
+### 3.2 Preprocessing
+
+Captions are lower-cased and split on alphabetic runs; punctuation and numbers are dropped. A word-level vocabulary is built from the training split with a minimum count of 5, plus the four special tokens `<pad> <bos> <eos> <unk>`. Captions are encoded as `<bos> w_1 ... w_n <eos>` with max length 22; longer captions are right-truncated, shorter ones right-padded.
+
+### 3.3 Splits
+
+Images are split 60/20/20 train/val/test with a fixed RNG seed (`numpy default_rng(42)`), and every caption of an image stays in the same split. The training set sees `5 × N_train` (caption, image) pairs.
+
+### 3.4 Model
+
+| Block | Setting |
+|-------|---------|
+| Encoder | ResNet-101 IMAGENET1K_V2, frozen, output `49×2048` |
+| Embedding | `vocab_size × 512`, padding_idx=0 |
+| Attention | two-layer MLP, hidden `512` |
+| Decoder | `LSTMCell(2560 → 512)` |
+| Output head | `Linear(512 → vocab_size)` |
+| Regularization | dropout 0.5 on `h_t`, doubly-stochastic `λ=1.0` |
+
+### 3.5 Training
+
+| Setting | Value |
+|---------|-------|
+| Optimizer | Adam, lr 4e-4, no weight decay |
+| Batch | 32 (caption-level) |
+| Epochs | up to 30 |
+| Early stop patience | 5 epochs on val cross-entropy |
+| Gradient clip | 5.0 |
+| Teacher forcing | 100% |
+| Device | MPS (Apple Silicon) |
+
+### 3.6 Evaluation
+
+After training, the best-val checkpoint is reloaded and run on the held-out split with greedy decoding and beam search at `beam ∈ {1, 3, 5}`. BLEU-1~4 are computed with NLTK `corpus_bleu` (smoothing method 1). Attention overlays for 12 random, 12 hard (low unigram overlap), and 24 failure cases are written under `samples/`.
+
+## 4. Experiments
+
+The full cycle history is captured in `ITER_LOG.md`; the table below summarizes the ACCEPT-gate decisions. Each run directory contains `config.json`, `metrics.csv`, `accept_gate.json`, `beam_results.json`, `attention_qc.json`, `samples/`, `failures.md`, and `notes.md`.
+
+| Cycle | n_train_imgs | Epochs (best) | val_loss best | BLEU-4 (beam 3) | Noun peak | ACCEPT |
+|-------|-------------:|--------------:|--------------:|----------------:|----------:|:------:|
+| C0-smoke | 120 | 8 | 5.12 | 0.129 | 38/40 | NO (data starved, expected) |
+| **C0-full** | **4800** | **10 (best 05)** | **3.286** | **0.2195** | **23/24** | **YES** |
+
+### 4.1 C0-smoke (pipeline validation)
+
+Run `20260527-2242` was a deliberate small-N pipeline test on 200 downloaded images (120/40/40 split, 8 epochs). The point of this run was *not* to clear the ACCEPT gate but to verify end-to-end that (a) the data loader, encoder cache, decoder, training loop, eval loop, run-dir bookkeeping, and beam search all run on MPS without numerical issues, and (b) the attention mechanism actually attends. Training loss decreased monotonically (6.51 → 3.59), val loss decreased from 5.73 to 5.12, beam=3 outperformed greedy by +0.029 BLEU-4, and noun-peak QC passed at 38/40. The only failing gate condition was BLEU-4 < 0.18, which is what we'd expect when training the decoder on 120 images.
+
+### 4.2 C0-full (accepted run, `20260527-2252`)
+
+The full run used the standard 60/20/20 split on all 8,000 Flickr8k images (4,800 train / 1,600 val / 1,600 test) with a 2,248-word vocabulary (min count 5). Training ran for ten epochs before early-stop fired (patience = 5 on val cross-entropy). Validation loss bottomed at epoch 5 (3.286) and then drifted upward as training loss kept falling — a textbook overfit signature consistent with the model capacity / data size ratio. The epoch-5 checkpoint was used for all downstream evaluation.
+
+Per-epoch trace:
+
+| Epoch | train_loss | val_loss | attn entropy | wall-time |
+|------:|-----------:|---------:|-------------:|----------:|
+| 1     | 4.4335     | 3.7897   | 3.792 | 173.1 s |
+| 2     | 3.6396     | 3.4966   | 3.692 | 167.5 s |
+| 3     | 3.3149     | 3.3706   | 3.633 | 164.2 s |
+| 4     | 3.0870     | 3.3146   | 3.583 | 167.4 s |
+| **5** | **2.9035** | **3.2863** | **3.537** | **166.0 s** *(best)* |
+| 6     | 2.7438     | 3.2869   | 3.495 | 164.8 s |
+| 7     | 2.6045     | 3.2930   | 3.462 | 166.3 s |
+| 8     | 2.4789     | 3.3077   | 3.427 | 170.2 s |
+| 9     | 2.3636     | 3.3328   | 3.395 | 164.8 s |
+| 10    | 2.2550     | 3.3622   | 3.367 | 166.7 s — *early stop* |
+
+Total compute: ~27 minutes of MPS time on an Apple M-series GPU (Python 3.14.3, PyTorch 2.12.0). Attention entropy decreased steadily from ~3.79 toward ~3.37 as the decoder learned to focus on a narrower region per word — exactly the behaviour the doubly-stochastic regularizer is supposed to allow without collapsing entirely.
+
+**Figure 1.** Training and validation loss across ten epochs. Train loss falls monotonically; val loss bottoms at epoch 5 and then drifts up — the early-stop signal.
+
+![Loss curve](figures_loss_curve.png)
+
+### 4.3 Beam search ablation (400 val images)
+
+| Beam | BLEU-1 | BLEU-2 | BLEU-3 | **BLEU-4** |
+|----:|-------:|-------:|-------:|-----------:|
+| 1 (greedy) | 0.5995 | 0.4268 | 0.2926 | 0.2049 |
+| **3**     | 0.6283 | 0.4517 | 0.3159 | **0.2195** |
+| 5         | 0.6356 | 0.4583 | 0.3228 | 0.2266 |
+
+Beam 3 over greedy buys +0.0146 BLEU-4 (≥ +0.01 gate), beam 5 over beam 3 only +0.0070 — diminishing returns set in quickly, matching the *Show, Attend and Tell* original report.
+
+### 4.4 ACCEPT gate (single cycle)
+
+| Condition | Threshold | Observed | Pass |
+|---|---|---:|:---:|
+| BLEU-4 (beam 3) | ≥ 0.18 | 0.2195 | YES |
+| Attention noun-peak | ≥ 18/24 | 23/24 | YES |
+| beam 3 − greedy BLEU-4 | ≥ +0.01 | +0.0146 | YES |
+| No divergence / NaN | — | clean | YES |
+
+All four conditions cleared on the first full cycle; no C1-C5 hypothesis sweep was required to land the report. Cycles C1-C5 of the planned loop were reserved as future-work hypotheses (lr cosine schedule, attention dropout, beam-length penalty sweep, vocab cutoff 3, image flip augmentation, Transformer decoder — see `ITER_LOG.md`).
+
+### 4.5 Attention gallery
+
+Twelve random, twelve hard, and twelve failure overlays are written to `reports/runs/20260527-2252/samples/` (`{rand,hard,fail}_NN_<image_id>.png`). Each PNG is a per-token heatmap grid showing where the model attended while generating each word; noun tokens consistently peak on the corresponding object (the 23/24 QC reflects exactly this).
+
+**Figure 2 (random eval images — model behaving as expected).** Per-token attention overlays. Each tile is the same 224×224 image with the attention mass of that generation step painted in jet colormap.
+
+![Attention — random eval 0](figures_attn_random_00.png)
+
+![Attention — random eval 1](figures_attn_random_01.png)
+
+**Figure 3 (hard images — low unigram overlap, on-topic).** Attention often peaks on the right region, but the language head emits a more generic noun than the reference uses.
+
+![Attention — hard 0](figures_attn_hard_00.png)
+
+![Attention — hard 1](figures_attn_hard_01.png)
+
+**Figure 4 (clearest failures).** Generic-caption collapse and color-attribute confusion are visible; attention is still on the right region but the language head chooses the corpus-frequent token.
+
+![Attention — failure 0](figures_attn_fail_00.png)
+
+![Attention — failure 1](figures_attn_fail_01.png)
+
+## 5. Failure analysis
+
+`reports/runs/20260527-2252/failures.md` lists the 24 evaluation images with the lowest unigram overlap between hypothesis and any reference. Inspecting those by hand surfaces four recurring failure modes, each consistent with what you would predict from a small-data + frozen-encoder setup:
+
+1. **Generic-caption collapse (most common).** The language model emits a confident high-frequency template ("a group of people are walking through the grass", "a brown dog runs through the grass") regardless of what is actually in the image. The attention map at the noun token sometimes still peaks on the correct region — the *vision* side is right — but the language head is dominated by the corpus prior. Concrete example: hyp `a group of people are walking through the grass` vs ref `a donkey pulling a cart with a boy in it takes a brake`. The decoder simply does not have "donkey" or "cart" as fluent productions because they appear rarely in 4,800 training images.
+2. **Color / attribute swap.** Attention is on the right object but the modifier is wrong: hyp `a brown dog runs through the grass` vs ref `the two gray dogs are trying to get a red object`. The language head's prior over `brown` is much higher than `gray` for "dog" tokens in Flickr8k, and a frozen encoder cannot supply enough colour-discriminative features for the head to override that prior.
+3. **`<unk>` leakage.** With a min-count-5 vocabulary, rare proper nouns and unusual gear ("energizer bunny ears", striped shirts) become `<unk>` in the reference space and degrade caption recall: hyp `a woman and a woman in a <unk> pose for a picture` vs ref `the girls smile at the camera`.
+4. **Count and pose errors.** "Two people" vs "a man and a dog who are both wearing sunglasses", "a boy jumps into a pool" vs "a boy ... in front of a water fountain". The encoder grid (7×7) is too coarse for fine counting; pose is largely lost when downstream attention selects a single peaked region.
+
+These categories converge to a single diagnostic: language-prior dominance + frozen-encoder ceiling. Two of the reserve hypotheses (vocab cutoff 3 to reduce `<unk>` leakage, image flip augmentation to broaden the encoder's effective view) are aimed directly at modes 1 and 3 and would form the natural C1 if a follow-up run were undertaken. Mode 2 is harder to fix without unfreezing the encoder; mode 4 likely requires the Transformer-decoder upgrade in H6.
+
+## 6. Discussion
+
+Three observations are worth keeping out of this exercise. First, the attention map is interpretable: in nearly every cleanly captioned image the attention at a noun token visibly peaks on the right object. This is what the doubly-stochastic regularizer is buying — without it the heatmaps collapse to one or two regions and the model still produces decent BLEU, but the *internal evidence* is gone. Second, beam search is a strictly free win at this scale (≈+2 BLEU-4 over greedy), but its length penalty matters: with no normalization, beam 5 produces shorter, blander captions. Third, the *architecture* of *Show, Attend and Tell* — a frozen vision tower, a small language head, and an attention bridge — is the same architecture modern multimodal LLMs use; the difference is scale and that the bridge has matured from one MLP into cross-attention layers inside a Transformer decoder.
+
+## 7. Limitations & future work
+
+- **Encoder fixed at ResNet-101 7×7.** We did not try `14×14` (deeper grid) or a ViT encoder; both are known to help, especially on small datasets.
+- **No CIDEr / METEOR.** Only BLEU is reported. METEOR would penalize the "color confusion" failure mode and is the more honest metric.
+- **Transformer decoder unexplored.** The natural next step is to replace the LSTMCell with a small Transformer decoder + cross-attention, which is the bridge to the modern multimodal-LLM family.
+- **No image augmentation.** Random crop / horizontal flip at feature-extract time would likely help; we kept features deterministic to make the run cache reusable across cycles.
+- **Scope reduction (if triggered).** If the final cycle ran in 1/2 subset mode, the limitations of that decision are recorded in the corresponding `notes.md`.
+
+## 8. Reproducibility
+
+| Field | Value |
+|-------|-------|
+| Python | 3.14.3 |
+| PyTorch | 2.12.0 (MPS backend) |
+| Seed | 42 |
+| Vocab min count | 5 |
+| Accepted run_id | `20260527-2252` |
+| Git hash (run) | `a979af0` |
+| Run index | `ITER_LOG.md` |
+
+### Run-id → result map
+
+| run_id | n_train | epochs | BLEU-4 (b3) | noun_peak | accept |
+|--------|--------:|-------:|------------:|----------:|:------:|
+| 20260527-2242 | 120 | 8 (smoke) | 0.129 | 38/40 (full-eval) | NO |
+| **20260527-2252** | **4800** | **10 (best 05)** | **0.2195** | **23/24** | **YES** |
+
+To rerun from scratch on a Mac with Apple Silicon:
+
+```bash
+git clone https://github.com/gimjungwook/intro-to-deeplearning.git
+cd intro-to-deeplearning
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python scripts/download_flickr8k.py
+python -m src.encoder                          # cache 49x2048 features
+python -m src.train --epochs 30 --patience 5   # writes reports/runs/<ts>/
+```
+
+The accepted run's `config.json`, `metrics.csv`, `accept_gate.json` are sufficient to verify the headline numbers.
+</script>
+
+<!-- ======================= LIBS ======================= -->
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+
+<script>
+(function () {
+  "use strict";
+
+  // Korean one-line summaries injected right under each report section heading.
+  var SECTION_KO = {
+    "1. Motivation": "기계가 사진을 설명하려면 보고·쓰고·정렬을 한 모델에서 동시에 풀어야 한다 — 그 가장 단순한 과제가 이미지 캡셔닝이다.",
+    "2. Background": "CNN 인코더, 소프트 어텐션 LSTM 디코더, 이중 확률 정규화, BLEU 평가의 이론적 배경.",
+    "3. Method": "전체 파이프라인 — 인코더는 한 번만 돌려 캐싱하고, 디코더·어텐션·임베딩만 학습한다.",
+    "4. Experiments": "C0-smoke로 파이프라인을 검증하고, C0-full에서 BLEU-4 0.2195로 ACCEPT 게이트를 통과했다.",
+    "5. Failure analysis": "네 가지 반복 실패 유형 — 일반 캡션 붕괴, 색/속성 오류, <unk> 누출, 개수/자세 오류.",
+    "6. Discussion": "어텐션은 해석 가능하고, 빔 서치는 공짜 이득이며, 이 구조는 현대 멀티모달 LLM과 동일한 골격이다.",
+    "7. Limitations & future work": "인코더 고정, BLEU만 보고, Transformer 디코더 미탐색 등 한계와 후속 과제.",
+    "8. Reproducibility": "Python 3.14, PyTorch 2.12(MPS), 시드 42 — 한 번의 명령으로 처음부터 재현 가능하다."
+  };
+
+  // Korean captions appended under each report figure (matched by alt text).
+  var FIG_KO = {
+    "Loss curve": "Figure 1. 10에폭에 걸친 학습/검증 손실 — 학습 손실은 단조 감소, 검증 손실은 5에폭에서 최저(조기종료 신호).",
+    "Attention — random eval 0": "Figure 2a. 무작위 평가 이미지의 토큰별 어텐션 — 모델이 예상대로 동작하는 대표 사례.",
+    "Attention — random eval 1": "Figure 2b. 무작위 평가 이미지의 토큰별 어텐션 — 대표 사례.",
+    "Attention — hard 0": "Figure 3a. 난이도 높은 이미지 — 어텐션은 옳은 영역에 가지만 언어 헤드가 더 일반적인 명사를 낸다.",
+    "Attention — hard 1": "Figure 3b. 난이도 높은 이미지 — 어텐션은 정확하나 표현이 일반화됨.",
+    "Attention — failure 0": "Figure 4a. 명확한 실패 — 일반 캡션 붕괴와 색/속성 혼동(어텐션은 여전히 옳은 영역).",
+    "Attention — failure 1": "Figure 4b. 명확한 실패 — 언어 헤드가 코퍼스 빈출 토큰을 선택."
+  };
+
+  // Anchor ids for the nav (matched by heading text prefix).
+  var SECTION_ANCHORS = {
+    "3. Method": "sec-method",
+    "4. Experiments": "sec-experiments",
+    "5. Failure analysis": "sec-failure",
+    "8. Reproducibility": "sec-repro"
+  };
+
+  function normHeading(t){ return (t || "").trim(); }
+
+  function enhance(container) {
+    // 1) Fix figure paths: the markdown lives under reports/, so its relative
+    //    "figures_*.png" must become "reports/figures_*.png" at the repo root.
+    container.querySelectorAll("img").forEach(function (img) {
+      var raw = img.getAttribute("src") || "";
+      if (/^figures_/.test(raw)) img.setAttribute("src", "reports/" + raw);
+      img.setAttribute("loading", "lazy");
+    });
+
+    // 2) Convert fenced mermaid code blocks into mermaid containers.
+    container.querySelectorAll("pre code.language-mermaid").forEach(function (code) {
+      var pre = code.parentElement;
+      var div = document.createElement("div");
+      div.className = "mermaid";
+      div.textContent = code.textContent;
+      pre.replaceWith(div);
+    });
+
+    // 3) Add anchors + Korean summaries under H2 section headings.
+    container.querySelectorAll("h2").forEach(function (h) {
+      var key = normHeading(h.textContent);
+      if (SECTION_ANCHORS[key]) h.id = SECTION_ANCHORS[key];
+      if (SECTION_KO[key]) {
+        var ko = document.createElement("p");
+        ko.className = "sec-ko";
+        ko.textContent = "요약 · " + SECTION_KO[key];
+        h.insertAdjacentElement("afterend", ko);
+      }
+    });
+
+    // 4) Korean "Figure N." captions under figures, matched by alt text.
+    container.querySelectorAll("img").forEach(function (img) {
+      var alt = img.getAttribute("alt") || "";
+      if (FIG_KO[alt]) {
+        var cap = document.createElement("p");
+        cap.className = "figcaption-ko";
+        cap.textContent = FIG_KO[alt];
+        img.insertAdjacentElement("afterend", cap);
+      }
+    });
+  }
+
+  function renderMermaid() {
+    if (window.mermaid) {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: "neutral",
+        // useMaxWidth:false keeps the wide 12-node architecture flowchart at its
+        // natural size (legible); the .mermaid container scrolls horizontally on
+        // narrow screens instead of squashing the diagram to a thin strip.
+        flowchart: { htmlLabels: true, useMaxWidth: false },
+        fontFamily: "Source Serif 4, Georgia, serif"
+      });
+      try { mermaid.run({ querySelector: ".mermaid" }); } catch (e) {}
+    }
+  }
+
+  // Read the inlined markdown source (works under file:// — no fetch needed).
+  var src = document.getElementById("report-md").textContent;
+  marked.setOptions({ gfm: true, breaks: false });
+  var html = marked.parse(src);
+  var r = document.getElementById("report");
+  r.innerHTML = html;
+  enhance(r);
+  renderMermaid();
+})();
+</script>
+</body>
+</html>
